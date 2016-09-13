@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+
+
+    <bean id="parserService" class="win.liumian.stock.service.DataParserService">
+        <property name="priceRecord" ref="priceRecord"/>
+    </bean>
+
+    <bean id="adjustService" class="win.liumian.stock.service.DataAdjustService">
+        <property name="priceRecord" ref="priceRecord"/>
+    </bean>
+
+    <bean id="codeSingleton" class="win.liumian.stock.util.CodeSingleton">
+        <constructor-arg name="fileName" value="code.txt"/>
+    </bean>
+
+
+    <bean id="priceRecord" class="win.liumian.stock.po.StockCollection" >
+        <constructor-arg name="initialCapacity" value="2400"/>
+    </bean>
+
+    <bean id="forkJoinPool" class="java.util.concurrent.ForkJoinPool"/>
+
+
+    <!-- 任务具体实现细节 -->
+    <!-- 抓取任务  -->
+    <bean id="crawlJob" class="win.liumian.stock.quartz.job.CrawlJob">
+        <property name="codeSingleton" ref="codeSingleton"/>
+        <property name="priceRecord" ref="priceRecord"/>
+        <property name="pool" ref="forkJoinPool"/>
+    </bean>
+
+    <bean id="clearJob" class="win.liumian.stock.quartz.job.ClearJob">
+        <property name="adjustService" ref="adjustService"/>
+    </bean>
+
+
+    <bean id="crawlJobMethod" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+        <property name="targetObject">
+            <ref bean="crawlJob"/>
+        </property>
+        <property name="targetMethod">  <!-- 要执行的方法名称 -->
+            <value>execute</value>
+        </property>
+    </bean>
+
+    <bean id="clearJobMethod" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+        <property name="targetObject">
+            <ref bean="clearJob"/>
+        </property>
+        <property name="targetMethod">  <!-- 要执行的方法名称 -->
+            <value>execute</value>
+        </property>
+    </bean>
+
+
+
+
+    <!-- ======================== 调度触发器 ======================== -->
+    <bean id="crawlTrigger1" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+        <property name="jobDetail" ref="crawlJobMethod"></property>
+        <property name="cronExpression" value="58 30/1 9 ? * 1-5"></property> <!-- 九点半到十点  -->
+    </bean>
+
+    <bean id="crawlTrigger2" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+        <property name="jobDetail" ref="crawlJobMethod"></property>
+        <property name="cronExpression" value="58 * 10 ? * 1-5"></property> <!-- 十点到十一点  -->
+    </bean>
+
+    <bean id="crawlTrigger3" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+        <property name="jobDetail" ref="crawlJobMethod"></property>
+        <property name="cronExpression" value="58 0-30 11 ? * 1-5"></property> <!-- 十一点到十一点半  -->
+    </bean>
+
+    <bean id="crawlTrigger4" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+        <property name="jobDetail" ref="crawlJobMethod"></property>
+        <property name="cronExpression" value="58 * 13,14 ? * 1-5"></property> <!-- 下午一点到三点  -->
+    </bean>
+
+
+    <bean id="clearTrigger" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+        <property name="jobDetail" ref="clearJobMethod"></property>
+        <property name="cronExpression" value="30 30 8 ? * 1-5"></property>
+    </bean>
+
+    <!-- ======================== 调度工厂 ======================== -->
+    <bean id="SpringJobSchedulerFactoryBean" class="org.springframework.scheduling.quartz.SchedulerFactoryBean">
+        <property name="triggers">
+            <list>
+                <ref bean="crawlTrigger1"/>
+                <ref bean="crawlTrigger2"/>
+                <ref bean="crawlTrigger3"/>
+                <ref bean="crawlTrigger4"/>
+                <ref bean="clearTrigger"/>
+                <!--<ref bean="crawlTriggerTest"/>-->
+            </list>
+        </property>
+    </bean>
+
+
+</beans>
